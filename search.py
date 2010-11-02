@@ -30,9 +30,13 @@ class Search(object):
             return person
         return None
 
-    def score_last_commit(author, block):
-        # Git blame.
-        pass
+    def score_last_commit(self, block):
+        scores = {}
+        contributors, num_lines_total = self.lines_contributed(block)
+        for contributor, contribution in contributors.items():
+            scores[contributor] = float(contribution)/num_lines_total
+        return scores
+
 
     def lines_contributed(self, block):
         """
@@ -53,6 +57,8 @@ class Search(object):
             # We are at the first line of group or sub-group.
             sha, ln_orig, ln_final, ln_group = lines[i].split()
             ln_group = int(ln_group)
+
+            num_lines_total += ln_group
 
             if not shas.issuperset((sha,)):
                 shas.add(sha)
@@ -85,7 +91,7 @@ class Search(object):
                 # We are in an old sub-group, so update author's contributions.
                 contributions[person] += ln_group
                 i = util.spin_lines_until(lines, i, 'filename')
-        return contributions
+        return contributions, num_lines_total
 
 class Person(object):
     def __init__(self, name=None, email=None):
@@ -96,7 +102,7 @@ class Person(object):
         return self.name == person.name and self.email == person.email
 
     def __str__(self):
-        return "Name: %s Email: %s" % (self.name, self.email)
+        return "Name: %s, Email: %s" % (self.name, self.email)
 
 class Block(object):
     """
