@@ -38,7 +38,7 @@ class Search(object):
         return scores
 
 
-    def lines_contributed(self, block):
+    def lines_contributed(self, block, rev="HEAD"):
         """
         Given a block, return a hash {author: num lines contributed}.
         """
@@ -46,7 +46,7 @@ class Search(object):
         contributions = {}      # author => num lines
         shas = set()
 
-        blamestr = self.repo.git.blame(block, incremental=True)
+        blamestr = self.repo.git.blame(rev, block, incremental=True)
         lines = blamestr.splitlines()
 
         num_lines_total = 0
