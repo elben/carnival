@@ -1,4 +1,5 @@
 import git
+import util
 
 class Search(object):
     header_titles = ["author", "author-mail", "author-time", "author-tz",
@@ -50,29 +51,21 @@ class Search(object):
         i = 0
         while i < len(lines):
             # We are at the first line of group or sub-group.
-            print "At line with content: " + lines[i]
             sha, ln_orig, ln_final, ln_group = lines[i].split()
-
             ln_group = int(ln_group)
-            num_lines_total += ln_group
 
             if not shas.issuperset((sha,)):
                 shas.add(sha)
-                # We are at a new commit group. Figure out the author.
 
+                # We are at a new commit group. Figure out the author.
                 author_name, author_email = None, None
                 while not (author_name and author_email):
-                    # TODO We see 'author' before we see 'author-mail', but
-                    # 'author-mail' does not exist. Find way to check if
-                    # 'author-mail' exists even after finding 'author'
                     i += 1
                     components = lines[i].split(" ")
-                    #print "Finding authors: " + lines[i]
                     if components[0] == 'author':
                         author_name = " ".join(components[1:])
                     elif components[0] == 'author-mail':
                         author_email = " ".join(components[1:]).strip("<").strip(">")
-                print "Author name: %s \t Author email: %s" % (author_name, author_email)
 
                 # Add line count to author.
                 person = self.find_author(name=author_name, email=author_email,
@@ -84,33 +77,15 @@ class Search(object):
                 
                 # We got the data we want. Spin until we get to 'filename', which
                 # marks the end of this sub-group.
-                spin = True
-                while spin:
-                    i += 1
-                    components = lines[i].split(" ")
-                    #print "Spinning until filename: " + lines[i]
+                i = util.spin_lines_until(lines, i, 'filename')
 
-                    if components[0] == 'filename':
-                        i += 1
-                        spin = False
                 # We are now one line past 'filename'. The next line should contain
                 # a SHA.
             else:
                 # We are in an old sub-group, so update author's contributions.
                 contributions[person] += ln_group
-                spin = True
-                while spin:
-                    i += 1
-                    components = lines[i].split(" ")
-                    #print "Spinning until filename: " + lines[i]
-
-                    if components[0] == 'filename':
-                        i += 1
-                        spin = False
-        print num_lines_total
+                i = util.spin_lines_until(lines, i, 'filename')
         return contributions
-
-
 
 class Person(object):
     def __init__(self, name=None, email=None):
