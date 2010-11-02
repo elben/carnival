@@ -24,7 +24,9 @@ class Search(object):
             elif author.name == email:
                 return author
         if add_author:
-            self.authors.push(Person(name, email))
+            person = Person(name, email)
+            self.authors.append(person)
+            return person
         return None
 
     def score_last_commit(author, block):
@@ -36,9 +38,10 @@ class Search(object):
         Given a block, return a hash {author: num lines contributed}.
         """
 
-        contributions = {}
+        contributions = {}      # author => num lines
+        shas = set()
 
-        blamestr = self.repo.git.blame(block, porcelain=True)
+        blamestr = self.repo.git.blame(block, incremental=True)
         lines = blamestr.splitlines()
 
         num_lines_total = 0
@@ -46,50 +49,68 @@ class Search(object):
         sha = None
         i = 0
         while i < len(lines):
-            # We are at the first line of a group.
+            # We are at the first line of group or sub-group.
             print "At line with content: " + lines[i]
             sha, ln_orig, ln_final, ln_group = lines[i].split()
+
             ln_group = int(ln_group)
             num_lines_total += ln_group
 
-            # Figure out author.
-            author_name = None
-            author_email = None
-            while not author_name:
-                # TODO We see 'author' before we see 'author-mail', but
-                # 'author-mail' does not exist. Find way to check if
-                # 'author-mail' exists even after finding 'author'
-                i += 1
-                components = lines[i].split(" ")
-                print "Finding authors: " + lines[i]
-                if components[0] == 'author':
-                    author_name = " ".join(components[1:])
-                elif components[0] == 'author-mail':
-                    author_email = " ".join(components[1:]).strip("<").strip(">")
+            if not shas.issuperset((sha,)):
+                shas.add(sha)
+                # We are at a new commit group. Figure out the author.
+
+                author_name, author_email = None, None
+                while not (author_name and author_email):
+                    # TODO We see 'author' before we see 'author-mail', but
+                    # 'author-mail' does not exist. Find way to check if
+                    # 'author-mail' exists even after finding 'author'
+                    i += 1
+                    components = lines[i].split(" ")
+                    #print "Finding authors: " + lines[i]
+                    if components[0] == 'author':
+                        author_name = " ".join(components[1:])
+                    elif components[0] == 'author-mail':
+                        author_email = " ".join(components[1:]).strip("<").strip(">")
                 print "Author name: %s \t Author email: %s" % (author_name, author_email)
 
-            # Add line count to author.
-            person = self.find_author(name=author_name, email=author_email)
-            if contributions.has_key(person):
-                contributions[person] += ln_group
-            else:
-                contributions[person] = 0
-            
-            # We got the data we want. So spin through lines until we get to a
-            # new group.
-            spin = True
-            while spin:
-                i += 1
-                components = lines[i].split(" ")
-                print "Spinning: " + lines[i]
-                if (Search.header_titles.count(components[0]) == 0 and
-                        len(components) == 4):
-                    # a SHA header for a new group, so quit spinning and leave
-                    # this line as the current line (because it contains the
-                    # SHA).
-                    spin = False
+                # Add line count to author.
+                person = self.find_author(name=author_name, email=author_email,
+                        add_author=True)
+                if contributions.has_key(person):
+                    contributions[person] += ln_group
+                else:
+                    contributions[person] = ln_group
+                
+                # We got the data we want. Spin until we get to 'filename', which
+                # marks the end of this sub-group.
+                spin = True
+                while spin:
+                    i += 1
+                    components = lines[i].split(" ")
+                    #print "Spinning until filename: " + lines[i]
 
-        
+                    if components[0] == 'filename':
+                        i += 1
+                        spin = False
+                # We are now one line past 'filename'. The next line should contain
+                # a SHA.
+            else:
+                # We are in an old sub-group, so update author's contributions.
+                contributions[person] += ln_group
+                spin = True
+                while spin:
+                    i += 1
+                    components = lines[i].split(" ")
+                    #print "Spinning until filename: " + lines[i]
+
+                    if components[0] == 'filename':
+                        i += 1
+                        spin = False
+        print num_lines_total
+        return contributions
+
+
 
 class Person(object):
     def __init__(self, name=None, email=None):
@@ -98,6 +119,9 @@ class Person(object):
 
     def __eq__(self, person):
         return self.name == person.name and self.email == person.email
+
+    def __str__(self):
+        return "Name: %s Email: %s" % (self.name, self.email)
 
 class Block(object):
     """
