@@ -11,44 +11,6 @@ class Search(object):
 
         self.authors = []
 
-    def rev_list(self, block, rev='HEAD'):
-        """
-        Return list of revision hashes. Ordered from earliest to latest.
-        """
-        revs = self.repo.rev_list(rev, block).split()
-        revs.reverse()  # earliest commits first
-        return revs
-
-    def lines_contributed_for_revs(self, block, revs):
-        contributions = []  # [(Person, num lines contributed)]
-        for rev in revs:
-            rev_contributions = self.lines_contributed(block, rev)
-            for sha, data in rev_contributions.items():
-                person = data[0]
-                num_lines = data[1]
-
-                # TODO stuff here
-
-
-    def find_author(self, name=None, email=None, add_author=False):
-        """
-        Find author with given name and/or email. If author does not exist,
-        add the author if add_author is True.
-        """
-
-        for author in self.authors:
-            if name and email and author.name == name and author.email == email:
-                return author
-            elif name and author.name == name:
-                return author
-            elif author.name == email:
-                return author
-        if add_author:
-            person = Person(name, email)
-            self.authors.append(person)
-            return person
-        return None
-
     def score_last_commit(self, block):
         """
         Implementation of Score_last_commit(author, block).
@@ -73,6 +35,49 @@ class Search(object):
         return scores
 
 
+    def rev_list(self, block, rev='HEAD'):
+        """
+        Return list of revision hashes. Ordered from earliest to latest.
+        """
+        revs = self.repo.git.rev_list(rev, block).split()
+        revs.reverse()  # earliest commits first
+        return revs
+
+    def find_author(self, name=None, email=None, add_author=False):
+        """
+        Find author with given name and/or email. If author does not exist,
+        add the author if add_author is True.
+        """
+
+        for author in self.authors:
+            if name and email and author.name == name and author.email == email:
+                return author
+            elif name and author.name == name:
+                return author
+            elif author.name == email:
+                return author
+        if add_author:
+            person = Person(name, email)
+            self.authors.append(person)
+            return person
+        return None
+
+    def lines_contributed_for_revs(self, block, revs):
+        contributions = {}  # {rev => [(Person, num lines contributed)]}
+        shas = set()
+        for rev in revs:
+            rev_contributions, num_lines_total = self.lines_contributed(block, rev)
+            for sha, data in rev_contributions.items():
+                if sha != rev:
+                    continue
+
+                #shas.add(sha)
+                person = data[0]
+                num_lines = data[1]
+                contributions[rev] = [person, num_lines]
+        return contributions
+
+
     def lines_contributed(self, block, rev="HEAD"):
         """
         Given a block, return a dict {SHA => [Person, num lines]}
@@ -95,7 +100,7 @@ class Search(object):
 
             num_lines_total += ln_group
 
-            if not shas.issuperset((sha,)):
+            if sha not in shas:
                 shas.add(sha)
 
                 # We are at a new commit group. Figure out the author.
