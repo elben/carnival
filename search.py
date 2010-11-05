@@ -54,7 +54,17 @@ class Search(object):
         scores = {}
         contributors, num_lines_total = self.lines_contributed(block)
         for sha, data in contributors.items():
-            scores[data[0]] = float(data[1])/num_lines_total
+            person = data[0]
+            num_lines = data[1]
+            if scores.has_key(person):
+                scores[data[0]] += float(data[1])
+            else:
+                scores[data[0]] = float(data[1])
+
+        # Normalize.
+        for k, v in scores.items():
+            scores[k] = v/num_lines_total
+
         return scores
 
 
@@ -123,6 +133,9 @@ class Person(object):
 
     def __str__(self):
         return "Name: %s, Email: %s" % (self.name, self.email)
+
+    def __repr__(self):
+        return object.__repr__(self) + (" (Name: %s, Email: %s)" % (self.name, self.email))
 
 class Block(object):
     """
