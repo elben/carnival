@@ -11,6 +11,20 @@ class Search(object):
 
         self.authors = []
 
+    def rev_list(self, block, rev='HEAD'):
+        """
+        Return list of revision hashes. Ordered from earliest to latest.
+        """
+        revs = self.repo.rev_list(rev, block).split()
+        revs.reverse()  # earliest commits first
+        return revs
+
+    def lines_contributed_for_revs(self, block, revs):
+        contributions = []  # [(Person, num lines contributed)]
+        for rev in revs:
+            rev_contributions = self.lines_contributed(block, rev)
+
+
     def find_author(self, name=None, email=None, add_author=False):
         """
         Find author with given name and/or email. If author does not exist,
@@ -31,6 +45,12 @@ class Search(object):
         return None
 
     def score_last_commit(self, block):
+        """
+        Implementation of Score_last_commit(author, block).
+
+        Returns a hash of author to the contribution [0, 1] of the author
+        for this particular block. Uses the current statistics of the block.
+        """
         scores = {}
         contributors, num_lines_total = self.lines_contributed(block)
         for contributor, contribution in contributors.items():
@@ -40,10 +60,12 @@ class Search(object):
 
     def lines_contributed(self, block, rev="HEAD"):
         """
-        Given a block, return a hash {author: num lines contributed}.
+        Given a block, return a dict {author: num lines contributed}.
         """
 
         contributions = {}      # author => num lines
+                                # {sha => (Person, num lines)}
+        #contributions = []      # [(Person, num lines, hash)]
         shas = set()
 
         blamestr = self.repo.git.blame(rev, block, incremental=True)
