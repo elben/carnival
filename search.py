@@ -11,16 +11,39 @@ class Search(object):
 
         self.authors = []
 
+    def score_all_commits(self, block):
+        """
+        Returns a hash of author to the contribution [0, 1] of the author for
+        this particular block, using all commits of this block.
+
+        In other words, we consider all lines of code the author has ever added
+        in the past for this block.
+
+        We normalize against the total number of line contributions ever,
+        instead of the current total number of lines.
+
+        TODO: what about lines of code the author has removed?
+        """
+
+        revs = self.rev_list(block)
+        contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
+        return self._score_author_contributions_(contributions, num_lines_total)
+
     def score_last_commit(self, block):
         """
         Implementation of Score_last_commit(author, block).
 
         Returns a hash of author to the contribution [0, 1] of the author
-        for this particular block. Uses the current statistics of the block.
+        for this particular block, using last commit of the block.
         """
+
+        contributions, num_lines_total = self.lines_contributed(block)
+        return self._score_author_contributions_(contributions, num_lines_total)
+
+    def _score_author_contributions_(self, contributions,
+            num_lines_total, *args):
         scores = {}
-        contributors, num_lines_total = self.lines_contributed(block)
-        for sha, data in contributors.items():
+        for sha, data in contributions.items():
             person = data[0]
             num_lines = data[1]
             if scores.has_key(person):
@@ -34,11 +57,16 @@ class Search(object):
 
         return scores
 
-
     def rev_list(self, block, rev='HEAD'):
         """
         Return list of revision hashes. Ordered from earliest to latest.
         """
+
+        # We don't use the --all flag for git-rev-list. This is because the
+        # --all flag will grab all references to the block, including "dangling"
+        # references such as commit blobs that were thrown away.
+
+        # We make the assumption that we don't want to use thrown-away code.
         revs = self.repo.git.rev_list(rev, block).split()
         revs.reverse()  # earliest commits first
         return revs
@@ -63,8 +91,14 @@ class Search(object):
         return None
 
     def lines_contributed_for_revs(self, block, revs):
+        """
+        Given a block, return a dict {SHA => [Person, num lines]}.
+
+        But 
+        """
         contributions = {}  # {rev => [(Person, num lines contributed)]}
         shas = set()
+        num_lines_total = 0
         for rev in revs:
             rev_contributions, num_lines_total = self.lines_contributed(block, rev)
             for sha, data in rev_contributions.items():
@@ -75,12 +109,17 @@ class Search(object):
                 person = data[0]
                 num_lines = data[1]
                 contributions[rev] = [person, num_lines]
-        return contributions
+                num_lines_total += num_lines
+        return contributions, num_lines_total
 
 
     def lines_contributed(self, block, rev="HEAD"):
         """
-        Given a block, return a dict {SHA => [Person, num lines]}
+        Given a block, return a dict {SHA => [Person, num lines]}.
+
+        This method only looks at the blame outputs produced by hash 'rev'.
+        Past contributions that is overriden by later contributions is not seen.
+        To see this data, use lines_contributed_for_revs().
         """
 
         contributions = {}      # {SHA => [Person, num lines]}
