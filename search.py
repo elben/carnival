@@ -53,19 +53,17 @@ class Search(object):
         """
         scores = {}
         contributors, num_lines_total = self.lines_contributed(block)
-        for contributor, contribution in contributors.items():
-            scores[contributor] = float(contribution)/num_lines_total
+        for sha, data in contributors.items():
+            scores[data[0]] = float(data[1])/num_lines_total
         return scores
 
 
     def lines_contributed(self, block, rev="HEAD"):
         """
-        Given a block, return a dict {author: num lines contributed}.
+        Given a block, return a dict {SHA => [Person, num lines]}
         """
 
-        contributions = {}      # author => num lines
-                                # {sha => (Person, num lines)}
-        #contributions = []      # [(Person, num lines, hash)]
+        contributions = {}      # {SHA => [Person, num lines]}
         shas = set()
 
         blamestr = self.repo.git.blame(rev, block, incremental=True)
@@ -98,10 +96,10 @@ class Search(object):
                 # Add line count to author.
                 person = self.find_author(name=author_name, email=author_email,
                         add_author=True)
-                if contributions.has_key(person):
-                    contributions[person] += ln_group
+                if contributions.has_key(sha):
+                    contributions[sha][1] += ln_group
                 else:
-                    contributions[person] = ln_group
+                    contributions[sha] = [person, ln_group]
                 
                 # We got the data we want. Spin until we get to 'filename', which
                 # marks the end of this sub-group.
@@ -111,7 +109,7 @@ class Search(object):
                 # a SHA.
             else:
                 # We are in an old sub-group, so update author's contributions.
-                contributions[person] += ln_group
+                contributions[sha][1] += ln_group
                 i = util.spin_lines_until(lines, i, 'filename')
         return contributions, num_lines_total
 
