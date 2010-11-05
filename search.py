@@ -23,6 +23,11 @@ class Search(object):
         contributions = []  # [(Person, num lines contributed)]
         for rev in revs:
             rev_contributions = self.lines_contributed(block, rev)
+            for sha, data in rev_contributions.items():
+                person = data[0]
+                num_lines = data[1]
+
+                # TODO stuff here
 
 
     def find_author(self, name=None, email=None, add_author=False):
