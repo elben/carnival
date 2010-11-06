@@ -1,5 +1,7 @@
 import git
 import util
+import math
+import time
 
 class Search(object):
     header_titles = ["author", "author-mail", "author-time", "author-tz",
@@ -11,8 +13,60 @@ class Search(object):
 
         self.authors = []
 
+    def aging_exp(self, days, lmb=0.005):
+        """
+        """
+        return math.exp(-days*lmb)
+
+    def aging_linear(self, days, lmb=0.5):
+        """
+        """
+
+    def datetime(self, rev):
+        """
+        Given an object hash, return the unix time that object was created.
+        """
+
+        # The format documentation can be found at "man git-show". %H is the
+        # commit hash and %at is the author-date in unix time.
+        show = self.repo.git.show(rev, format="%H%n%at", name_only=True)
+        lines = show.splitlines()
+        return int(lines[1])
+
+    def datetimes(self, revs):
+        """
+        Given a list of revisions, return a dict {hash => unix time}
+
+        git show --format="commit: %H%nauthor-date: %at" --name-only e22109ebd4b5cf1e0efbef2f6ecc5f257efc24be
+        """
+        datetimes = {}
+        for rev in revs:
+            datetimes[rev] = self.datetime(rev)
+        return datetimes
+
+    def days_since(self, rev):
+        now = time.time()
+        then = self.datetime(rev)
+        diff = float(now - then)
+        return diff / 60 / 60 / 24
+
+    def score_all_commits_over_time(self, block):
+        """
+        Returns a hash of author to the contribution [0, 1] of the author for
+        this particular block, using all commits of this block with
+        consideration to the temporal dimension.
+        """
+
+        revs = self.rev_list(block)
+        datetimes = self.datetimes(revs)
+        contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
+        return self._score_author_contributions(contributions, num_lines_total,
+                aging='exp')
+
     def score_all_commits(self, block):
         """
+        Implementation of Score_{AllCommits}(author, block).
+
         Returns a hash of author to the contribution [0, 1] of the author for
         this particular block, using all commits of this block.
 
@@ -27,29 +81,36 @@ class Search(object):
 
         revs = self.rev_list(block)
         contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
-        return self._score_author_contributions_(contributions, num_lines_total)
+        return self._score_author_contributions(contributions, num_lines_total)
 
     def score_last_commit(self, block):
         """
-        Implementation of Score_last_commit(author, block).
+        Implementation of Score_{LastCommit}(author, block).
 
         Returns a hash of author to the contribution [0, 1] of the author
         for this particular block, using last commit of the block.
         """
 
         contributions, num_lines_total = self.lines_contributed(block)
-        return self._score_author_contributions_(contributions, num_lines_total)
+        return self._score_author_contributions(contributions, num_lines_total)
 
-    def _score_author_contributions_(self, contributions,
-            num_lines_total, *args):
+    def _score_author_contributions(self, contributions,
+            num_lines_total, aging=None):
         scores = {}
         for sha, data in contributions.items():
             person = data[0]
             num_lines = data[1]
-            if scores.has_key(person):
-                scores[data[0]] += float(data[1])
+
+            cont = float(data[1])
+            if aging == 'exp':
+                cont *= self.aging_exp(self.days_since(sha))
+            elif aging == 'linear':
+                cont *= 1 # TODO implement
+
+            if person in scores:
+                scores[data[0]] += cont
             else:
-                scores[data[0]] = float(data[1])
+                scores[data[0]] = cont
 
         # Normalize.
         for k, v in scores.items():
@@ -100,7 +161,7 @@ class Search(object):
         shas = set()
         num_lines_total = 0
         for rev in revs:
-            rev_contributions, num_lines_total = self.lines_contributed(block, rev)
+            rev_contributions, num_lines_rev = self.lines_contributed(block, rev)
             for sha, data in rev_contributions.items():
                 if sha != rev:
                     continue
@@ -108,7 +169,10 @@ class Search(object):
                 #shas.add(sha)
                 person = data[0]
                 num_lines = data[1]
-                contributions[rev] = [person, num_lines]
+                if rev in contributions:
+                    contributions[rev][1] += num_lines
+                else:
+                    contributions[rev] = [person, num_lines]
                 num_lines_total += num_lines
         return contributions, num_lines_total
 
@@ -155,7 +219,7 @@ class Search(object):
                 # Add line count to author.
                 person = self.find_author(name=author_name, email=author_email,
                         add_author=True)
-                if contributions.has_key(sha):
+                if sha in contributions:
                     contributions[sha][1] += ln_group
                 else:
                     contributions[sha] = [person, ln_group]
