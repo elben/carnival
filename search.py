@@ -35,7 +35,7 @@ class Search(object):
 
     def datetimes(self, revs):
         """
-        Given a list of revisions, return a dict {hash => unix time}
+        Given a list of revisions, return a dict {commit hash: unix time}
 
         git show --format="commit: %H%nauthor-date: %at" --name-only e22109ebd4b5cf1e0efbef2f6ecc5f257efc24be
         """
@@ -52,7 +52,7 @@ class Search(object):
 
     def score_all_commits_over_time(self, block):
         """
-        Returns a hash of author to the contribution [0, 1] of the author for
+        Returns a dict of author to the contribution [0, 1] of the author for
         this particular block, using all commits of this block with
         consideration to the temporal dimension.
         """
@@ -67,7 +67,7 @@ class Search(object):
         """
         Implementation of Score_{AllCommits}(author, block).
 
-        Returns a hash of author to the contribution [0, 1] of the author for
+        Returns a dict of author to the contribution [0, 1] of the author for
         this particular block, using all commits of this block.
 
         In other words, we consider all lines of code the author has ever added
@@ -87,7 +87,7 @@ class Search(object):
         """
         Implementation of Score_{LastCommit}(author, block).
 
-        Returns a hash of author to the contribution [0, 1] of the author
+        Returns a dict of author to the contribution [0, 1] of the author
         for this particular block, using last commit of the block.
         """
 
@@ -120,7 +120,7 @@ class Search(object):
 
     def rev_list(self, block, rev='HEAD'):
         """
-        Return list of revision hashes. Ordered from earliest to latest.
+        Return list of commit hashes. Ordered from earliest to latest.
         """
 
         # We don't use the --all flag for git-rev-list. This is because the
@@ -153,11 +153,17 @@ class Search(object):
 
     def lines_contributed_for_revs(self, block, revs):
         """
-        Given a block, return a dict {SHA => [Person, num lines]}.
+        Given a block, return a dict of commit hashes to the author and author's
+        contribution for each revision in revs:
 
-        But 
+            {commit hash: {
+                'author': Person
+                'num_lines': integer}}
+
+        Each commit hash has exactly one author. This is different from
+        lines_contributed, which may contain more than one authors.
         """
-        contributions = {}  # {rev => [(Person, num lines contributed)]}
+        contributions = {}  # {rev: [(Person, num lines contributed)]}
         shas = set()
         num_lines_total = 0
         for rev in revs:
@@ -179,14 +185,19 @@ class Search(object):
 
     def lines_contributed(self, block, rev="HEAD"):
         """
-        Given a block, return a dict {SHA => [Person, num lines]}.
+        Given a block, return a dict of commit hashes to the author and author's
+        contribution:
 
-        This method only looks at the blame outputs produced by hash 'rev'.
+            {commit hash: {
+                'author': Person
+                'num_lines': integer}}
+
+        This method only looks at the blame outputs produced by commit hash 'rev'.
         Past contributions that is overriden by later contributions is not seen.
         To see this data, use lines_contributed_for_revs().
         """
 
-        contributions = {}      # {SHA => [Person, num lines]}
+        contributions = {}      # {commit hash: [Person, num lines]}
         shas = set()
 
         blamestr = self.repo.git.blame(rev, block, incremental=True)
