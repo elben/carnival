@@ -112,8 +112,6 @@ class Search(object):
             score = float(num_lines)
             if aging == 'exp':
                 score *= self.aging_exp(self.days_since(sha))
-            elif aging == 'linear':
-                score *= 1 # TODO implement
 
             total_score += score
             if person in scores:
