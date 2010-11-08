@@ -60,8 +60,7 @@ class Search(object):
         revs = self.rev_list(block)
         datetimes = self.datetimes(revs)
         contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
-        return self._score_author_contributions(contributions, num_lines_total,
-                aging='exp')
+        return self._score_author_contributions(contributions, aging='exp')
 
     def score_all_commits(self, block):
         """
@@ -81,7 +80,7 @@ class Search(object):
 
         revs = self.rev_list(block)
         contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
-        return self._score_author_contributions(contributions, num_lines_total)
+        return self._score_author_contributions(contributions)
 
     def score_last_commit(self, block):
         """
@@ -92,29 +91,39 @@ class Search(object):
         """
 
         contributions, num_lines_total = self.lines_contributed(block)
-        return self._score_author_contributions(contributions, num_lines_total)
+        return self._score_author_contributions(contributions)
 
-    def _score_author_contributions(self, contributions,
-            num_lines_total, aging=None):
+    def _score_author_contributions(self, contributions, aging=None,
+            normalize=True):
+        """
+        Takes a dict {commit hash: {...}} and inverses it to a dict
+        {Person: score}. 
+        
+        A person may show up multiple times in contributions, but this function
+        will squish all of that into one person.
+        """
+
         scores = {}
+        total_score = 0
         for sha, data in contributions.items():
-            person = data[0]
-            num_lines = data[1]
+            person = data['person']
+            num_lines = data['num_lines']
 
-            cont = float(data[1])
+            score = float(num_lines)
             if aging == 'exp':
-                cont *= self.aging_exp(self.days_since(sha))
+                score *= self.aging_exp(self.days_since(sha))
             elif aging == 'linear':
-                cont *= 1 # TODO implement
+                score *= 1 # TODO implement
 
+            total_score += score
             if person in scores:
-                scores[data[0]] += cont
+                scores[person] += score
             else:
-                scores[data[0]] = cont
+                scores[person] = score
 
-        # Normalize.
-        for k, v in scores.items():
-            scores[k] = v/num_lines_total
+        if normalize:
+            for k, v in scores.items():
+                scores[k] = v/total_score
 
         return scores
 
@@ -173,12 +182,13 @@ class Search(object):
                     continue
 
                 #shas.add(sha)
-                person = data[0]
-                num_lines = data[1]
+                person = data['person']
+                num_lines = data['num_lines']
                 if rev in contributions:
-                    contributions[rev][1] += num_lines
+                    contributions[rev]['num_lines'] += num_lines
                 else:
-                    contributions[rev] = [person, num_lines]
+                    contributions[rev] = {'person': person,
+                            'num_lines': num_lines}
                 num_lines_total += num_lines
         return contributions, num_lines_total
 
@@ -231,9 +241,10 @@ class Search(object):
                 person = self.find_author(name=author_name, email=author_email,
                         add_author=True)
                 if sha in contributions:
-                    contributions[sha][1] += ln_group
+                    contributions[sha]['num_lines'] += ln_group
                 else:
-                    contributions[sha] = [person, ln_group]
+                    contributions[sha] = {'person': person,
+                            'num_lines': ln_group}
                 
                 # We got the data we want. Spin until we get to 'filename', which
                 # marks the end of this sub-group.
@@ -243,7 +254,7 @@ class Search(object):
                 # a SHA.
             else:
                 # We are in an old sub-group, so update author's contributions.
-                contributions[sha][1] += ln_group
+                contributions[sha]['num_lines'] += ln_group
                 i = util.spin_lines_until(lines, i, 'filename')
         return contributions, num_lines_total
 
