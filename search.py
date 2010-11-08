@@ -4,9 +4,6 @@ import math
 import time
 
 class Search(object):
-    header_titles = ["author", "author-mail", "author-time", "author-tz",
-                    "committer", "committer-mail", "committer-time", "committer-tz",
-                    "summary", "previous", "filename", "\t"]
     def __init__(self, repo_path):
         self.repo_path = repo_path
         self.repo = git.Repo(repo_path, odbt=git.GitDB)
