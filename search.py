@@ -3,6 +3,14 @@ import util
 import math
 import time
 
+def niceprint(scores):
+    items = []
+    for person, score in scores.items():
+        items.append({'person':person, 'score':score})
+    items.sort(cmp=lambda x,y: cmp(y['score'], x['score']))
+    for item in items:
+        print "%s: %0.5f" % (item['person'].email, item['score'])
+
 class Search(object):
     def __init__(self, repo_path):
         self.repo_path = repo_path
