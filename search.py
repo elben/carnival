@@ -2,7 +2,19 @@ import git
 import util
 import math
 import time
+import csv
 
+def to_csv(scores, filename='out.csv', show_email=True, show_name=False):
+    writer = csv.writer(open(filename, 'wb'))
+    for person, score in scores.items():
+        row = []
+        if show_email:
+            row.append(person.email)
+        if show_name:
+            row.append(person.name)
+        row.append(score)
+        writer.writerow(row)
+    
 def niceprint(scores):
     items = []
     for person, score in scores.items():
