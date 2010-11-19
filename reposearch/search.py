@@ -3,15 +3,26 @@ import util
 import math
 import time
 import csv
+import hashlib
 
-def to_csv(scores, filename='out.csv', show_email=True, show_name=False):
+def to_csv(scores, filename='out.csv', show_email=True, show_name=False,
+        **kwargs):
+    """
+    scores is a dict {Person: score}.
+
+    Optional arguments:
+        algorithm, salt
+    """
+    person_num = 0
     writer = csv.writer(open(filename, 'wb'))
     for person, score in scores.items():
         row = []
         if show_email:
-            row.append(person.email)
+            email = util.anonymize(person.email, **kwargs)
+            row.append(email)
         if show_name:
-            row.append(person.name)
+            name = util.anonymize(person.name, **kwargs)
+            row.append(name)
         row.append(score)
         writer.writerow(row)
     
