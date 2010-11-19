@@ -30,43 +30,6 @@ class Search(object):
 
         self.authors = []
 
-    def aging_exp(self, days, lmb=0.005):
-        """
-        """
-        return math.exp(-days*lmb)
-
-    def aging_linear(self, days, lmb=0.5):
-        """
-        """
-
-    def datetime(self, rev):
-        """
-        Given an object hash, return the unix time that object was created.
-        """
-
-        # The format documentation can be found at "man git-show". %H is the
-        # commit hash and %at is the author-date in unix time.
-        show = self.repo.git.show(rev, format="%H%n%at", name_only=True)
-        lines = show.splitlines()
-        return int(lines[1])
-
-    def datetimes(self, revs):
-        """
-        Given a list of revisions, return a dict {commit hash: unix time}
-
-        git show --format="commit: %H%nauthor-date: %at" --name-only e22109ebd4b5cf1e0efbef2f6ecc5f257efc24be
-        """
-        datetimes = {}
-        for rev in revs:
-            datetimes[rev] = self.datetime(rev)
-        return datetimes
-
-    def days_since(self, rev):
-        now = time.time()
-        then = self.datetime(rev)
-        diff = float(now - then)
-        return diff / 60 / 60 / 24
-
     def score_all_commits_over_time(self, block):
         """
         Returns a dict of author to the contribution [0, 1] of the author for
@@ -74,9 +37,9 @@ class Search(object):
         consideration to the temporal dimension.
         """
 
-        revs = self.rev_list(block)
-        datetimes = self.datetimes(revs)
-        contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
+        revs = self._rev_list(block)
+        datetimes = self._datetimes(revs)
+        contributions, num_lines_total = self._lines_contributed_for_revs(block, revs)
         return self._score_author_contributions(contributions, aging='exp')
 
     def score_all_commits(self, block):
@@ -95,8 +58,8 @@ class Search(object):
         TODO: what about lines of code the author has removed?
         """
 
-        revs = self.rev_list(block)
-        contributions, num_lines_total = self.lines_contributed_for_revs(block, revs)
+        revs = self._rev_list(block)
+        contributions, num_lines_total = self._lines_contributed_for_revs(block, revs)
         return self._score_author_contributions(contributions)
 
     def score_last_commit(self, block):
@@ -107,7 +70,7 @@ class Search(object):
         for this particular block, using last commit of the block.
         """
 
-        contributions, num_lines_total = self.lines_contributed(block)
+        contributions, num_lines_total = self._lines_contributed(block)
         return self._score_author_contributions(contributions)
 
     def _score_author_contributions(self, contributions, aging=None,
@@ -128,7 +91,7 @@ class Search(object):
 
             score = float(num_lines)
             if aging == 'exp':
-                score *= self.aging_exp(self.days_since(sha))
+                score *= self._aging_exp(self._days_since(sha))
 
             total_score += score
             if person in scores:
@@ -142,7 +105,7 @@ class Search(object):
 
         return scores
 
-    def rev_list(self, block, rev='HEAD'):
+    def _rev_list(self, block, rev='HEAD'):
         """
         Return list of commit hashes. Ordered from earliest to latest.
         """
@@ -156,7 +119,7 @@ class Search(object):
         revs.reverse()  # earliest commits first
         return revs
 
-    def find_author(self, name=None, email=None, add_author=False):
+    def _find_author(self, name=None, email=None, add_author=False):
         """
         Find author with given name and/or email. If author does not exist,
         add the author if add_author is True.
@@ -175,7 +138,7 @@ class Search(object):
             return person
         return None
 
-    def lines_contributed_for_revs(self, block, revs):
+    def _lines_contributed_for_revs(self, block, revs):
         """
         Given a block, return a dict of commit hashes to the author and author's
         contribution for each revision in revs:
@@ -191,7 +154,7 @@ class Search(object):
         shas = set()
         num_lines_total = 0
         for rev in revs:
-            rev_contributions, num_lines_rev = self.lines_contributed(block, rev)
+            rev_contributions, num_lines_rev = self._lines_contributed(block, rev)
             for sha, data in rev_contributions.items():
                 if sha != rev:
                     continue
@@ -208,7 +171,7 @@ class Search(object):
         return contributions, num_lines_total
 
 
-    def lines_contributed(self, block, rev="HEAD"):
+    def _lines_contributed(self, block, rev="HEAD"):
         """
         Given a block, return a dict of commit hashes to the author and author's
         contribution:
@@ -253,7 +216,7 @@ class Search(object):
                         author_email = " ".join(components[1:]).strip("<").strip(">")
 
                 # Add line count to author.
-                person = self.find_author(name=author_name, email=author_email,
+                person = self._find_author(name=author_name, email=author_email,
                         add_author=True)
                 if sha in contributions:
                     contributions[sha]['num_lines'] += ln_group
@@ -272,6 +235,44 @@ class Search(object):
                 contributions[sha]['num_lines'] += ln_group
                 i = util.spin_lines_until(lines, i, 'filename')
         return contributions, num_lines_total
+
+    def _aging_exp(self, days, lmb=0.005):
+        """
+        """
+        return math.exp(-days*lmb)
+
+    def _aging_linear(self, days, lmb=0.5):
+        """
+        """
+
+    def _datetime(self, rev):
+        """
+        Given an object hash, return the unix time that object was created.
+        """
+
+        # The format documentation can be found at "man git-show". %H is the
+        # commit hash and %at is the author-date in unix time.
+        show = self.repo.git.show(rev, format="%H%n%at", name_only=True)
+        lines = show.splitlines()
+        return int(lines[1])
+
+    def _datetimes(self, revs):
+        """
+        Given a list of revisions, return a dict {commit hash: unix time}
+
+        git show --format="commit: %H%nauthor-date: %at" --name-only e22109ebd4b5cf1e0efbef2f6ecc5f257efc24be
+        """
+        datetimes = {}
+        for rev in revs:
+            datetimes[rev] = self._datetime(rev)
+        return datetimes
+
+    def _days_since(self, rev):
+        now = time.time()
+        then = self._datetime(rev)
+        diff = float(now - then)
+        return diff / 60 / 60 / 24
+
 
 class Person(object):
     def __init__(self, name=None, email=None):
