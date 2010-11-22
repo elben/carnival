@@ -247,14 +247,10 @@ class Search(object):
                 i = util.spin_lines_until(lines, i, 'filename')
         return contributions, num_lines_total
 
-    def _aging_exp(self, days, lmb=0.005):
+    def _aging_exp(self, days, lmb=0.005, min_val=0.1):
         """
         """
-        return math.exp(-days*lmb)
-
-    def _aging_linear(self, days, lmb=0.5):
-        """
-        """
+        return min(min_val, math.exp(-days*lmb))
 
     def _datetime(self, rev):
         """
