@@ -250,7 +250,7 @@ class Search(object):
     def _aging_exp(self, days, lmb=0.005, min_val=0.1):
         """
         """
-        return min(min_val, math.exp(-days*lmb))
+        return max(min_val, math.exp(-days*lmb))
 
     def _datetime(self, rev):
         """
