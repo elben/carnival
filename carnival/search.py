@@ -41,7 +41,7 @@ class Search(object):
 
         self.authors = []
 
-    def score_all_commits_over_time(self, block):
+    def score_all_commits_over_time(self, block, timenow=None):
         """
         Returns a dict of author to the contribution [0, 1] of the author for
         this particular block, using all commits of this block with
@@ -51,7 +51,7 @@ class Search(object):
         revs = self._rev_list(block)
         datetimes = self._datetimes(revs)
         contributions, num_lines_total = self._lines_contributed_for_revs(block, revs)
-        return self._score_author_contributions(contributions, aging='exp')
+        return self._score_author_contributions(contributions, timenow=timenow, aging='exp')
 
     def score_all_commits(self, block):
         """
