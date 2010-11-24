@@ -84,7 +84,7 @@ class Search(object):
         contributions, num_lines_total = self._lines_contributed(block)
         return self._score_author_contributions(contributions)
 
-    def _score_author_contributions(self, contributions, aging=None,
+    def _score_author_contributions(self, contributions, timenow=None, aging=None,
             normalize=True):
         """
         Takes a dict {commit hash: {...}} and inverses it to a dict
@@ -102,7 +102,7 @@ class Search(object):
 
             score = float(num_lines)
             if aging == 'exp':
-                score *= self._aging_exp(self._days_since(sha))
+                score *= self._aging_exp(self._days_since(sha, timenow))
 
             total_score += score
             if person in scores:
@@ -274,8 +274,8 @@ class Search(object):
             datetimes[rev] = self._datetime(rev)
         return datetimes
 
-    def _days_since(self, rev):
-        now = time.time()
+    def _days_since(self, rev, timenow=None):
+        now = timenow if timenow else time.time()
         then = self._datetime(rev)
         diff = float(now - then)
         return diff / 60 / 60 / 24
