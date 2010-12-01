@@ -92,6 +92,13 @@ class Search(object):
         
         A person may show up multiple times in contributions, but this function
         will squish all of that into one person.
+
+        Warning: A person is identified by the person's name and email. Thus,
+
+            Bob & Rachel <bob@example.com>
+            Bob <bob@example.com>
+
+        are two different people.
         """
 
         scores = {}
