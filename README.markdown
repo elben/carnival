@@ -16,6 +16,8 @@ We introduce a method for ﬁnding and ranking relevant experts. We then
 discuss an experiment that reveals the strengths and weaknesses of our method
 and of developers’ judgements. And ﬁnally, we discuss possible improvements.
 
+Read the rest of the paper here: http://elbenshira.com/d/carnival_report.pdf
+
 # Installing
 
     $ python setup.py install
