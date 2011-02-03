@@ -196,8 +196,7 @@ class Search(object):
         Each commit hash has exactly one author. This is different from
         _lines_contributed, which may contain more than one authors.
         """
-        contributions = {}  # {rev: [(Person, num lines contributed)]}
-        shas = set()
+        contributions = {}
         num_lines_total = 0
         for rev in revs:
             rev_contributions, num_lines_rev = self._lines_contributed(block, rev)
@@ -207,7 +206,6 @@ class Search(object):
                     # from an older (thus, already counted) contribution.
                     continue
 
-                #shas.add(sha)
                 person = data['person']
                 num_lines = data['num_lines']
                 if rev in contributions:
