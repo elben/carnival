@@ -35,6 +35,33 @@ def niceprint(scores):
         print "%s: %0.5f" % (item['person'].email, item['score'])
 
 class Search(object):
+    """
+    A couple of notes:
+        
+        Say author a creates a file with 3 lines:
+
+            1: hi
+            2: today is nice
+            3: isn't it?
+
+        Then author b modfiies it:
+
+            1: hi
+            2: today is nice
+            3: but yesterday was not
+
+        In this case, if we run score_all_commits, author a will have
+        with 3 line changes, and author b will have 1 line change.
+
+        But if author b modifies it instead to:
+
+            1: hi
+            2: today is nice
+
+        Then author a will still get 3 lines. But author b will get 0 lines.
+        In other words, we don't count removal of lines as contributions!
+    """
+
     def __init__(self, repo_path):
         self.repo_path = repo_path
         self.repo = git.Repo(repo_path, odbt=git.GitDB)
@@ -128,11 +155,11 @@ class Search(object):
         Return list of commit hashes. Ordered from earliest to latest.
         """
 
-        # We don't use the --all flag for git-rev-list. This is because the
-        # --all flag will grab all references to the block, including "dangling"
-        # references such as commit blobs that were thrown away.
-
         # We make the assumption that we don't want to use thrown-away code.
+        # Thus, we don't use the --all flag for git-rev-list. This is because
+        # the --all flag will grab all references to the block, including
+        # "dangling" references such as commit blobs that were thrown away.
+
         revs = self.repo.git.rev_list(rev, block).split()
         revs.reverse()  # earliest commits first
         return revs
@@ -161,12 +188,13 @@ class Search(object):
         Given a block, return a dict of commit hashes to the author and author's
         contribution for each revision in revs:
 
-            {commit hash: {
-                'author': Person
-                'num_lines': integer}}
+            contributions = {rev_1: {'num_lines': num_lines,
+                                     'person': Person,},
+                             rev_2: ...}
+                                     
 
         Each commit hash has exactly one author. This is different from
-        lines_contributed, which may contain more than one authors.
+        _lines_contributed, which may contain more than one authors.
         """
         contributions = {}  # {rev: [(Person, num lines contributed)]}
         shas = set()
@@ -175,12 +203,16 @@ class Search(object):
             rev_contributions, num_lines_rev = self._lines_contributed(block, rev)
             for sha, data in rev_contributions.items():
                 if sha != rev:
+                    # This sha irrelevant for this iteration. For example, it is
+                    # from an older (thus, already counted) contribution.
                     continue
 
                 #shas.add(sha)
                 person = data['person']
                 num_lines = data['num_lines']
                 if rev in contributions:
+                    # We could see the same rev multiple times because they are
+                    # split up by line blocks by the git-blame output.
                     contributions[rev]['num_lines'] += num_lines
                 else:
                     contributions[rev] = {'person': person,
@@ -194,13 +226,13 @@ class Search(object):
         Given a block, return a dict of commit hashes to the author and author's
         contribution:
 
-            {commit hash: {
-                'author': Person
-                'num_lines': integer}}
+            contributions = {sha_1: {'person': Person,
+                                     'num_lines': num_lines}
+                             sha_2: ...
 
         This method only looks at the blame outputs produced by commit hash 'rev'.
         Past contributions that is overriden by later contributions is not seen.
-        To see this data, use lines_contributed_for_revs().
+        To see this data, use _lines_contributed_for_revs().
         """
 
         contributions = {}      # {commit hash: [Person, num lines]}
